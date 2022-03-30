@@ -1,0 +1,9 @@
+[package]
+name = "eliza-discord"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+eliza = "2.0.0"
+serenity = { version = "0.10.0", default-features = false, features = ["client", "gateway", "rustls_backend", "model"] }
+tokio = { version = "1.0", features = ["macros", "rt-multi-thread"] }

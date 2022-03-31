@@ -33,7 +33,15 @@ impl EventHandler for ElizaHandler {
         let channel_name = if msg.is_private() {
             msg.author.name
         } else {
-            format!("{}@{}", msg.channel_id.name(&ctx.cache).await.unwrap_or_default(), msg.guild_id.unwrap_or_default().name(&ctx.cache).await.unwrap_or_default())
+            format!(
+                "{}@{}",
+                msg.channel_id.name(&ctx.cache).await.unwrap_or_default(),
+                msg.guild_id
+                    .unwrap_or_default()
+                    .name(&ctx.cache)
+                    .await
+                    .unwrap_or_default()
+            )
         };
         drop(
             self.active_channels

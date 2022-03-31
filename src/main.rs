@@ -1,18 +1,24 @@
-use eliza::Eliza;
 use std::collections::HashMap;
 use std::env;
 use std::sync::Mutex;
 use std::time::Duration;
 
+use also::Also;
+use chrono::Local;
+use eliza::Eliza;
 use serenity::async_trait;
 use serenity::client::{Client, Context, EventHandler};
 use serenity::model::channel::Message;
-use serenity::model::gateway::Ready;
-use serenity::model::guild::GuildStatus;
+
+use tui::ActiveChannel;
+use tui::{display_err, render};
+
+mod tui;
 
 const DOCTOR_SCRIPT: &str = include_str!("doctor.json");
 
 struct ElizaHandler {
+    active_channels: Mutex<HashMap<u64, tui::ActiveChannel>>,
     conversations: Mutex<HashMap<u64, Eliza>>,
 }
 
@@ -23,9 +29,34 @@ impl EventHandler for ElizaHandler {
             return;
         }
 
+        // Render channel activity
+        let channel_name = msg
+            .channel_id
+            .name(ctx.cache)
+            .await
+            .unwrap_or(String::new());
+        drop(
+            self.active_channels
+                .lock()
+                .expect("locking active channels map")
+                .also(|ac_map| {
+                    let ac = ac_map
+                        .entry(*msg.channel_id.as_u64())
+                        .or_insert(ActiveChannel {
+                            name: String::new(),
+                            last_activity: Local::now(),
+                        });
+                    ac.name = channel_name;
+                    ac.last_activity = Local::now();
+                    render(&ac_map);
+                }),
+        );
+
         // Simulate reaction time and typing for more realism
         tokio::time::sleep(Duration::from_millis(3100)).await;
-        msg.channel_id.broadcast_typing(&ctx.http).await;
+        if let Err(why) = msg.channel_id.broadcast_typing(&ctx.http).await {
+            display_err("Error broadcasting typing", why);
+        }
         tokio::time::sleep(Duration::from_millis(5000)).await;
 
         // Get Eliza instance for this channel and process the message
@@ -38,32 +69,8 @@ impl EventHandler for ElizaHandler {
             .respond(&msg.content);
 
         if let Err(why) = msg.channel_id.say(&ctx.http, response).await {
-            println!("Error sending message: {:?}", why);
+            display_err("Error sending message", why);
         }
-    }
-
-    async fn ready(&self, ctx: Context, ready: Ready) {
-        println!(
-            "{} is connected with the following guilds:",
-            ready.user.name
-        );
-        for guild in ready.guilds {
-            match guild {
-                GuildStatus::OnlinePartialGuild(opg) => {
-                    println!("{}", opg.name)
-                }
-                GuildStatus::OnlineGuild(og) => {
-                    println!("{}", og.name)
-                }
-                GuildStatus::Offline(o) => {
-                    println!("{} (unavailable)", o.id)
-                }
-                _ => {
-                    eprintln!("Unexpected guild status")
-                }
-            }
-        }
-        println!();
     }
 }
 
@@ -72,12 +79,21 @@ async fn main() {
     let token = env::var("ELIZA_DISCORD_TOKEN").expect("token");
     let mut client = Client::builder(token)
         .event_handler(ElizaHandler {
+            active_channels: Mutex::new(HashMap::new()),
             conversations: Mutex::new(HashMap::new()),
         })
         .await
         .expect("Error creating client");
 
-    if let Err(why) = client.start().await {
+    // Setup terminal
+    tui::setup();
+
+    let ret = client.start().await;
+
+    // Restore terminal
+    tui::restore();
+
+    if let Err(why) = ret {
         eprintln!("An error occurred while running the client: {:?}", why);
     }
 }

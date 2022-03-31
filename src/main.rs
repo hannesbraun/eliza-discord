@@ -30,25 +30,22 @@ impl EventHandler for ElizaHandler {
         }
 
         // Render channel activity
-        let channel_name = msg
-            .channel_id
-            .name(ctx.cache)
-            .await
-            .unwrap_or(String::new());
+        let channel_name = msg.channel_id.name(ctx.cache).await.unwrap_or_default();
         drop(
             self.active_channels
                 .lock()
                 .expect("locking active channels map")
                 .also(|ac_map| {
-                    let ac = ac_map
-                        .entry(*msg.channel_id.as_u64())
-                        .or_insert(ActiveChannel {
-                            name: String::new(),
-                            last_activity: Local::now(),
-                        });
+                    let ac =
+                        ac_map
+                            .entry(*msg.channel_id.as_u64())
+                            .or_insert_with(|| ActiveChannel {
+                                name: String::new(),
+                                last_activity: Local::now(),
+                            });
                     ac.name = channel_name;
                     ac.last_activity = Local::now();
-                    render(&ac_map);
+                    render(ac_map);
                 }),
         );
 
@@ -65,7 +62,9 @@ impl EventHandler for ElizaHandler {
             .lock()
             .expect("locking conversations map")
             .entry(*msg.channel_id.as_u64())
-            .or_insert(Eliza::from_str(DOCTOR_SCRIPT).expect("Unable to parse doctor script"))
+            .or_insert_with(|| {
+                Eliza::from_str(DOCTOR_SCRIPT).expect("Unable to parse doctor script")
+            })
             .respond(&msg.content);
 
         if let Err(why) = msg.channel_id.say(&ctx.http, response).await {

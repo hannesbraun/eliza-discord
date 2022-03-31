@@ -7,6 +7,7 @@ edition = "2021"
 also = "0.1.0"
 chrono = "0.4.19"
 crossterm = "0.23"
+ctrlc = "3.2.1"
 eliza = "2.0.0"
 serenity = { version = "0.10.10", default-features = false, features = ["cache", "client", "gateway", "model", "rustls_backend"] }
 tokio = { version = "1.17", features = ["macros", "rt-multi-thread"] }

@@ -85,6 +85,12 @@ async fn main() {
         .expect("Error creating client");
 
     // Setup terminal
+    ctrlc::set_handler(move || {
+        // Restore terminal after ctrl-c too
+        tui::restore();
+        std::process::exit(1);
+    })
+    .expect("Error setting Ctrl-C handler");
     tui::setup();
 
     let ret = client.start().await;

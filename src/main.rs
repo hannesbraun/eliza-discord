@@ -1,5 +1,5 @@
 use std::collections::HashMap;
-use std::env;
+use std::fs;
 use std::sync::Mutex;
 use std::time::Duration;
 
@@ -79,8 +79,11 @@ impl EventHandler for ElizaHandler {
 
 #[tokio::main]
 async fn main() {
-    let token = env::var("ELIZA_DISCORD_TOKEN").expect("token");
-    let mut client = Client::builder(token)
+    let token_filename = std::env::args()
+        .nth(1)
+        .unwrap_or_else(|| "ELIZA_DISCORD_TOKEN".to_string());
+    let token = fs::read_to_string(token_filename).expect("ELIZA_DISCORD_TOKEN");
+    let mut client = Client::builder(token.trim())
         .event_handler(ElizaHandler {
             active_channels: Mutex::new(HashMap::new()),
             conversations: Mutex::new(HashMap::new()),
